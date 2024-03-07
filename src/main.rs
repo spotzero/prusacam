@@ -54,15 +54,23 @@ impl CameraStatus {
 
 #[derive(Debug)]
 struct Runtime {
-  status: Vec<CameraStatus> ,
+  status: Vec<CameraStatus>,
+  use_gpio: bool,
 }
 
 fn main() {
     let config = load_config();
 
+    let mut use_gpio = false;
+    if config.gpio_switch.is_some() {
+        use_gpio = true;
+    }
+
     let mut runtime = Runtime {
-        status: vec![]
+        status: vec![],
+        use_gpio: use_gpio,
     };
+
 
     config.cameras.iter().for_each(|camera| {
         runtime.status.push(CameraStatus {
@@ -74,6 +82,15 @@ fn main() {
 
     loop {
         let now = SystemTime::now();
+        if runtime.use_gpio {
+            let gpio = Gpio::new().unwrap();
+            let mut pin = gpio.get(config.gpio_switch.unwrap()).unwrap().into_input_pullup();
+            if pin.is_high() {
+                sleep(Duration::new(1,0));
+                continue;
+            }
+        }
+
         for camera in &mut runtime.status {
             if now.duration_since(camera.last_run).unwrap().as_secs() > config.interval as u64 {
                 let image = camera.grab_image();
