@@ -1,0 +1,11 @@
+interval: 10
+gpio_switch: 5
+gpio_led: 6
+cameras:
+  -
+    name: "My camera 0"
+    device: /dev/video0
+    token: Camera 0's token
+    fingerprint: Fingerprint - between 16 and 64 characters
+    resolutionx: 1920
+    resolutiony: 1080
