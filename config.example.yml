@@ -1,6 +1,6 @@
 interval: 10
-gpio_switch: 5
-gpio_led: 6
+gpio_switch: 17
+gpio_led: 18
 cameras:
   -
     name: "My camera 0"

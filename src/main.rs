@@ -6,7 +6,7 @@ use std::io::Cursor;
 use std::io::Write;
 use std::time::{Duration, SystemTime};
 use std::thread::sleep;
-use rppal::gpio::Gpio;
+use rppal::gpio::{Gpio, InputPin, OutputPin};
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 struct Camera {
@@ -29,7 +29,6 @@ struct Config {
 #[derive(Debug)]
 pub struct CameraStatus {
     last_run: SystemTime,
-    status: bool,
     config: Camera,
 }
 
@@ -55,40 +54,79 @@ impl CameraStatus {
 #[derive(Debug)]
 struct Runtime {
   status: Vec<CameraStatus>,
-  use_gpio: bool,
+  gpio_pins: Option<GpioPins>,
 }
+
+#[derive(Debug)]
+struct GpioPins {
+    switch: InputPin,
+    led: OutputPin,
+}
+
+impl GpioPins {
+    fn can_record(&mut self) -> bool {
+        if self.switch.is_low() {
+            self.set_led(true);
+            return true;
+        } else {
+            self.set_led(false);
+            return false;
+        }
+    }
+
+    fn set_led(&mut self, on: bool) {
+        if on {
+            self.led.set_high();
+        } else {
+            self.led.set_low();
+        }
+    }
+}
+
 
 fn main() {
     let config = load_config();
-
-    let mut use_gpio = false;
+    println!("Config loaded: {:#?}", config);
+    let mut gpio_pins = None;
     if config.gpio_switch.is_some() {
-        use_gpio = true;
+        let gpio_result = Gpio::new();
+        match gpio_result {
+            Ok(g) => {
+                println!("GPIO initialized");
+                gpio_pins = Some(
+                    GpioPins {
+                        switch: g.get(config.gpio_switch.unwrap()).unwrap().into_input_pullup(),
+                        led: g.get(config.gpio_led.unwrap()).unwrap().into_output(),
+                    }
+                );
+            },
+            Err(_) => { }
+        }
     }
 
     let mut runtime = Runtime {
         status: vec![],
-        use_gpio: use_gpio,
+        gpio_pins: gpio_pins,
     };
 
 
     config.cameras.iter().for_each(|camera| {
         runtime.status.push(CameraStatus {
           last_run: SystemTime::UNIX_EPOCH,
-          status: true,
           config: camera.clone(),
         });
     });
 
     loop {
         let now = SystemTime::now();
-        if runtime.use_gpio {
-            let gpio = Gpio::new().unwrap();
-            let mut pin = gpio.get(config.gpio_switch.unwrap()).unwrap().into_input_pullup();
-            if pin.is_high() {
-                sleep(Duration::new(1,0));
-                continue;
-            }
+        match runtime.gpio_pins {
+            Some(ref mut pins) => {
+                if! pins.can_record() {
+                    sleep(Duration::new(1,0));
+                    continue;
+                }
+            },
+            None => {}
         }
 
         for camera in &mut runtime.status {
