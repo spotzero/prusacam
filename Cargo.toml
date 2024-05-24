@@ -11,6 +11,7 @@ rppal = "0.17.1"
 rscam = {version = "0.5.5", features = ["no_wrapper"]}
 serde = {version ="1.0.197",features = ["derive"]}
 serde_yaml = "0.9.32"
+signal-hook = "0.3.17"
 ureq = {version = "2.9.6", features = ["json"]}
 
 [profile.release]

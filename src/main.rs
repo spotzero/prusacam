@@ -7,6 +7,10 @@ use std::io::Write;
 use std::time::{Duration, SystemTime};
 use std::thread::sleep;
 use rppal::gpio::{Gpio, InputPin, OutputPin};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use signal_hook::consts::signal::SIGUSR1;
+
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 struct Camera {
@@ -60,12 +64,14 @@ struct Runtime {
 #[derive(Debug)]
 struct GpioPins {
     switch: InputPin,
+    check_low: bool,
     led: OutputPin,
 }
 
 impl GpioPins {
     fn can_record(&mut self) -> bool {
-        if self.switch.is_low() {
+        if (self.check_low && self.switch.is_low())
+          || (!self.check_low && self.switch.is_high()) {
             self.set_led(true);
             return true;
         } else {
@@ -88,6 +94,9 @@ fn main() {
     let config = load_config();
     println!("Config loaded: {:#?}", config);
     let mut gpio_pins = None;
+    let switch_dir = Arc::new(AtomicBool::new(false));
+    signal_hook::flag::register(SIGUSR1, Arc::clone(&switch_dir)).unwrap();
+
     if config.gpio_switch.is_some() {
         let gpio_result = Gpio::new();
         match gpio_result {
@@ -97,6 +106,7 @@ fn main() {
                     GpioPins {
                         switch: g.get(config.gpio_switch.unwrap()).unwrap().into_input_pullup(),
                         led: g.get(config.gpio_led.unwrap()).unwrap().into_output(),
+                        check_low: true,
                     }
                 );
             },
@@ -121,6 +131,10 @@ fn main() {
         let now = SystemTime::now();
         match runtime.gpio_pins {
             Some(ref mut pins) => {
+                if switch_dir.swap(false, Ordering::Relaxed) {
+                    println!("Switching switch direction");
+                    pins.check_low = !pins.check_low;
+                }
                 if! pins.can_record() {
                     sleep(Duration::new(1,0));
                     continue;
