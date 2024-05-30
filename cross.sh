@@ -1,1 +1,1 @@
-CROSS_CONTAINER_ENGINE=podman cross build --target arm-unknown-linux-gnueabihf -r --bin prusacam
+CROSS_CONTAINER_ENGINE=docker cross build --target arm-unknown-linux-gnueabihf -r --bin prusacam
