@@ -142,6 +142,8 @@ fn main() {
 
     let min_interval = config.endpoints.iter().map(|e| e.interval).min().unwrap();
 
+    let mut endpoint_last_upload = vec![vec![SystemTime::UNIX_EPOCH; config.endpoints.len()]; config.cameras.len()];
+
     loop {
         let now = SystemTime::now();
         match runtime.gpio_pins {
@@ -158,16 +160,17 @@ fn main() {
             None => {}
         }
 
-        for camera in &mut runtime.status {
+        for (camera_id, camera) in &mut runtime.status.iter_mut().enumerate() {
             let since = now.duration_since(camera.last_run).unwrap().as_secs();
             if since > min_interval {
                 let image = camera.grab_image();
                 if image.len() > 0 {
                     // Send image to endpoint that requires it based on interval.
-                    for endpoint in &config.endpoints {
-                        if since > endpoint.interval {
+                    for (endpoint_id, endpoint) in config.endpoints.iter().enumerate() {
+                        if now.duration_since(endpoint_last_upload[camera_id][endpoint_id]).unwrap().as_secs() > endpoint.interval {
                             update_info(&camera.config, &endpoint);
                             send_image(&camera.config, &image, &endpoint);
+                            endpoint_last_upload[camera_id][endpoint_id] = now;
                         }
                     }
                 } else {
@@ -196,10 +199,10 @@ fn send_image(camera: &Camera, image: &Vec<u8>, endpoint: &Endpoint) {
         .send_bytes(image.as_slice());
     match res {
         Ok(_) => {
-            println!("Image sent successfully to endpoint {}.", endpoint.name);
+            println!("Image from {} sent successfully to endpoint {}.", camera.name, endpoint.name);
         },
         Err(e) => {
-            println!("Error sending image to endpoint {}: {:?}", endpoint.name, e);
+            println!("Error sending image from {} to endpoint {}: {:?}", camera.name, endpoint.name, e);
         }
     }
 }
@@ -230,10 +233,10 @@ fn update_info(camera: &Camera, endpoint: &Endpoint) {
         ));
     match res {
         Ok(_) => {
-            println!("Update info successfully to endpoint {}.", endpoint.name);
+            println!("Update info for {} successfully to endpoint {}.", camera.name, endpoint.name);
         },
         Err(e) => {
-            println!("Error sending info to endpoint {}: {:?}", endpoint.name, e);
+            println!("Error sending info for {} to endpoint {}: {:?}", camera.name, endpoint.name, e);
         }
     }
 }
