@@ -58,7 +58,6 @@ The must be a config.yml file in the current working directory for prusacam to s
 
 config.yml should look like this:
 ```
-interval: 30         # Number of seconds between uploading.
 gpio_switch: 17      # GPIO input pin for the switch/toggle.
 gpio_led: 18         # GPIO output pin for the LED.
 cameras:             # An array of all the cameras, any number are supported and they'll be processed one at a time.
@@ -69,6 +68,12 @@ cameras:             # An array of all the cameras, any number are supported and
     fingerprint: Fingerprint - between 16 and 64 characters  # Camera's fingerprint, just set it to some random characters (but at least 16 of them)
     resolutionx: 1920             # The width of the image you want to capture (must be supported by the camera)
     resolutiony: 1080             # The height of the image you want to capture (must be supported by the camera)
+endpoints:
+  -
+    name: "Prusa Connect"                                        # Name of endpoint set
+    interval: 30                                                 # Number of seconds between uploading.
+    snapshot_url: https://connect.prusa3d.com/c/snapshot         # Snapshot PUT URL.
+    info_url: https://connect.prusa3d.com/c/info                 # Info URL (Optional)
 ```
 
 ### Installing

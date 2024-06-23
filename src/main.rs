@@ -25,9 +25,17 @@ struct Camera {
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct Config {
     cameras: Vec<Camera>,
-    interval: usize,
     gpio_switch: Option<u8>,
     gpio_led: Option<u8>,
+    endpoints: Vec<Endpoint>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct Endpoint {
+    name: String,
+    interval: u64,
+    snapshot_url: String,
+    info_url: Option<String>,
 }
 
 #[derive(Debug)]
@@ -39,7 +47,12 @@ pub struct CameraStatus {
 impl CameraStatus {
     fn grab_image(&mut self) -> Vec<u8> {
         print!("Grabbing image from camera {}", self.config.device);
-        let mut camera = rscam::Camera::new(self.config.device.as_str()).unwrap();
+        let camera_res = rscam::Camera::new(self.config.device.as_str());
+        if camera_res.is_err() {
+            println!("Error opening camera {}: {:?}", self.config.device, camera_res.err().unwrap());
+            return vec![];
+        }
+        let mut camera = camera_res.unwrap();
 
         camera.start(&rscam::Config {
             interval: (1, 30),      // 30 fps.
@@ -127,6 +140,8 @@ fn main() {
         });
     });
 
+    let min_interval = config.endpoints.iter().map(|e| e.interval).min().unwrap();
+
     loop {
         let now = SystemTime::now();
         match runtime.gpio_pins {
@@ -144,11 +159,17 @@ fn main() {
         }
 
         for camera in &mut runtime.status {
-            if now.duration_since(camera.last_run).unwrap().as_secs() > config.interval as u64 {
+            let since = now.duration_since(camera.last_run).unwrap().as_secs();
+            if since > min_interval {
                 let image = camera.grab_image();
                 if image.len() > 0 {
-                    update_info(&camera.config);
-                    send_image(&camera.config, image);
+                    // Send image to endpoint that requires it based on interval.
+                    for endpoint in &config.endpoints {
+                        if since > endpoint.interval {
+                            update_info(&camera.config, &endpoint);
+                            send_image(&camera.config, &image, &endpoint);
+                        }
+                    }
                 } else {
                     println!("Error grabbing image from camera {}.", camera.config.device);
                 }
@@ -164,8 +185,8 @@ fn load_config() -> Config {
     serde_yaml::from_reader(f).unwrap()
 }
 
-fn send_image(camera: &Camera, image: Vec<u8>) {
-    let url = "https://connect.prusa3d.com/c/snapshot";
+fn send_image(camera: &Camera, image: &Vec<u8>, endpoint: &Endpoint) {
+    let url = endpoint.snapshot_url.as_str();
     let res = ureq::put(url)
         .set("Content-Type", "image/jpg")
         .set("Accept", "*/*")
@@ -175,16 +196,20 @@ fn send_image(camera: &Camera, image: Vec<u8>) {
         .send_bytes(image.as_slice());
     match res {
         Ok(_) => {
-            println!("Image sent successfully");
+            println!("Image sent successfully to endpoint {}.", endpoint.name);
         },
         Err(e) => {
-            println!("Error sending image: {:?}", e);
+            println!("Error sending image to endpoint {}: {:?}", endpoint.name, e);
         }
     }
 }
 
-fn update_info(camera: &Camera) {
-    let url = "https://connect.prusa3d.com/c/info";
+fn update_info(camera: &Camera, endpoint: &Endpoint) {
+    if endpoint.info_url.is_none() {
+        return;
+    }
+
+    let url = endpoint.info_url.as_ref().unwrap().as_str();
     let res = ureq::put(url)
         .set("Content-Type", "application/json")
         .set("Token", camera.token.as_str())
@@ -205,10 +230,10 @@ fn update_info(camera: &Camera) {
         ));
     match res {
         Ok(_) => {
-            println!("Update info successfully");
+            println!("Update info successfully to endpoint {}.", endpoint.name);
         },
         Err(e) => {
-            println!("Error sending info: {:?}", e);
+            println!("Error sending info to endpoint {}: {:?}", endpoint.name, e);
         }
     }
 }

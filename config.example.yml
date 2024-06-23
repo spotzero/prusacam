@@ -1,4 +1,3 @@
-interval: 10
 gpio_switch: 17
 gpio_led: 18
 cameras:
@@ -9,3 +8,9 @@ cameras:
     fingerprint: Fingerprint - between 16 and 64 characters
     resolutionx: 1920
     resolutiony: 1080
+endpoints:
+  -
+    name: "Prusa Connect"
+    interval: 30
+    snapshot_url: https://connect.prusa3d.com/c/snapshot
+    info_url: https://connect.prusa3d.com/c/info
