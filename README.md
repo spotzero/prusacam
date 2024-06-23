@@ -10,9 +10,12 @@ Support taking periodic captures from multiple webcams and uploading them to Pru
 
 Supports the connection of a switch or toggle the the Raspberry Pi GPIO to act and an enable/disable of camera uploading.
 
-Support connection of an LED on the Raspberry Pi GPIO to at as an indicator of whether images are being uploaded.
+Supports connection of an LED on the Raspberry Pi GPIO to at as an indicator of whether images are being uploaded.
+
+Supports switching the camera on and off with signals.
 
 Currently only supports Linux.
+
 
 ## Getting Started
 
@@ -85,6 +88,14 @@ The prusacam binary can just be executed as is.
 ```
 nohup ./prusacam &
 ```
+
+### Switching the camera on and off from the command line
+
+`prusacam` will listen for the signal USR1 to act as the camera toggle.
+
+Just run: `killall prusacam -USR1` or `kill $PID -USR1`
+
+When a physical switch is connected and setup, both switches act like a three-way switch.
 
 ## Authors
 
