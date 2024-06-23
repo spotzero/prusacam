@@ -46,7 +46,7 @@ pub struct CameraStatus {
 
 impl CameraStatus {
     fn grab_image(&mut self) -> Vec<u8> {
-        print!("Grabbing image from camera {}", self.config.device);
+        println!("Grabbing image from camera {}", self.config.device);
         let camera_res = rscam::Camera::new(self.config.device.as_str());
         if camera_res.is_err() {
             println!("Error opening camera {}: {:?}", self.config.device, camera_res.err().unwrap());
